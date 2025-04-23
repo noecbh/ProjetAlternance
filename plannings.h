@@ -37,5 +37,6 @@ void creer_planning_semaine(Lutin *lutins, int nb_lutins, LigneFabrication semai
 void generer_semaine(Lutin *lutins, int nb_lutins, LigneFabrication semaine[MAX_LIGNES]);
 void afficher_semaine(LigneFabrication semaine[MAX_SEMAINES][7][MAX_LIGNES], int num_semaine);
 struct tm convertir_jour_date(int jour_absolu);
+void supprimer_lutin_des_plannings(LigneFabrication semaines[MAX_SEMAINES][7][MAX_LIGNES], Lutin *lutin_supprime);
 
 #endif

@@ -185,7 +185,7 @@ void calculer_horaires_ligne(LigneFabrication *ligne, int jour) {
 }
 
 void creer_planning_optimise(Lutin *lutins, int nb_lutins, LigneFabrication *lignes, int *nb_lignes, int jour) {
-    int i, j, l, debut, fin;
+    int i, j, l;
     int utilises[nb_lutins];
     int lignes_creees = 0;
     int tranches[3][2] = {{0, 8}, {8, 16}, {16, 24}};
@@ -195,8 +195,8 @@ void creer_planning_optimise(Lutin *lutins, int nb_lutins, LigneFabrication *lig
     }
 
     for (i = 0; i < 3; i++) {
-        debut = tranches[i][0];
-        fin = tranches[i][1];
+        int debut = tranches[i][0];
+        int fin = tranches[i][1];
 
         while (1) {
             Lutin *bricoleur = NULL;
@@ -205,15 +205,17 @@ void creer_planning_optimise(Lutin *lutins, int nb_lutins, LigneFabrication *lig
 
             for (j = 0; j < nb_lutins; j++) {
                 if (utilises[j]) continue;
-                if (!lutin_disponible(&lutins[j], jour, debut, fin)) continue;
+                if (lutins[j].nb_plages[jour] != 1) continue;
 
-                if (lutins[j].role == 1 && !bricoleur) {
+                PlageHoraire h = lutins[j].horaires[jour][0];
+                if (h.debut != debut || h.fin != fin) continue;
+
+                if (lutins[j].role == 1 && !bricoleur)
                     bricoleur = &lutins[j];
-                } else if (lutins[j].role == 2 && !controleur) {
+                else if (lutins[j].role == 2 && !controleur)
                     controleur = &lutins[j];
-                } else if (lutins[j].role == 3 && !empaqueteur) {
+                else if (lutins[j].role == 3 && !empaqueteur)
                     empaqueteur = &lutins[j];
-                }
             }
 
             if (bricoleur && controleur && empaqueteur) {
@@ -227,14 +229,23 @@ void creer_planning_optimise(Lutin *lutins, int nb_lutins, LigneFabrication *lig
                 /* Cherche une ligne existante compatible */
                 int ligne_placee = 0;
                 for (l = 0; l < lignes_creees; l++) {
-                    if (lignes[l].nb_segments < 10) {
+                    int libre = 1;
+                    for (int s = 0; s < lignes[l].nb_segments; s++) {
+                        SegmentPlanning *s_exist = &lignes[l].segments[s];
+                        if (!(seg.fin <= s_exist->debut || seg.debut >= s_exist->fin)) {
+                            libre = 0;
+                            break;
+                        }
+                    }
+
+                    if (libre && lignes[l].nb_segments < 10) {
                         lignes[l].segments[lignes[l].nb_segments++] = seg;
                         ligne_placee = 1;
                         break;
                     }
                 }
 
-                /* Sinon, crée une nouvelle ligne */
+                /* Si aucune ligne ne convient, crée une nouvelle ligne */
                 if (!ligne_placee && lignes_creees < *nb_lignes) {
                     lignes[lignes_creees].segments[0] = seg;
                     lignes[lignes_creees].nb_segments = 1;
@@ -252,92 +263,8 @@ void creer_planning_optimise(Lutin *lutins, int nb_lutins, LigneFabrication *lig
 
     *nb_lignes = lignes_creees;
 
-    printf("\nLutins non assignés :\n");
-    int trouve = 0;
-    for (i = 0; i < nb_lutins; i++) {
-        if (!utilises[i]) {
-            printf("- %s %s (%s) Horaires : [%d - %d]\n",
-                lutins[i].prenom, lutins[i].nom,
-                (lutins[i].role == 1 ? "Bricoleur" : (lutins[i].role == 2 ? "Contrôleur" : "Empaqueteur")),
-                lutins[i].horaires[jour][0].debut,
-                lutins[i].horaires[jour][0].fin
-            );
-            trouve = 1;
-        }
-    }
-
-    if (!trouve) {
-        printf("Aucun lutin non assigné !\n");
-    }
-
-    printf("\n%d ligne%s ont été créées avec succès !\n", lignes_creees, lignes_creees > 1 ? "s" : "");
 }
 
-void creer_planning_semaine(Lutin *lutins_originaux, int nb_lutins, LigneFabrication semaine[MAX_SEMAINES][7][MAX_LIGNES], int *nb_semaines) {
-    int num_semaine, jour, i;
-    struct tm date_base;
-    int jour_repos1, jour_repos2, shift, debut, fin;
-    /* Date de départ : lundi 7 avril 2025 */
-    date_base.tm_year = 2025 - 1900;
-    date_base.tm_mon = 3;  /* Avril = 3 car janvier = 0 */
-    date_base.tm_mday = 7;
-    date_base.tm_hour = 0;
-    date_base.tm_min = 0;
-    date_base.tm_sec = 0;
-    date_base.tm_isdst = -1;
-    mktime(&date_base);  /* Corrige les champs */
-
-    for (num_semaine = 0; num_semaine < *nb_semaines; num_semaine++) {
-        Lutin lutins_copie[MAX_LUTINS];
-        memcpy(lutins_copie, lutins_originaux, sizeof(Lutin) * nb_lutins);
-
-
-        debut=0;
-        fin=0;
-        
-        for (i = 0; i < nb_lutins; i++) {
-            jour_repos1 = rand() % 7;
-            do {
-                jour_repos2 = rand() % 7;
-            } while (jour_repos2 == jour_repos1);
-
-            for (jour = 0; jour < 7; jour++) {
-                if (jour == jour_repos1 || jour == jour_repos2) {
-                    lutins_copie[i].nb_plages[jour] = 0; /* Jour de repos */
-                } else {
-                    shift = rand() % 3;
-                    switch (shift) {
-                        case 0: debut = 0; fin = 8; break;
-                        case 1: debut = 8; fin = 16; break;
-                        case 2: debut = 16; fin = 24; break;
-                    }
-                    lutins_copie[i].nb_plages[jour] = 1;
-                    lutins_copie[i].horaires[jour][0].debut = debut;
-                    lutins_copie[i].horaires[jour][0].fin = fin;
-                }
-            }
-        }
-
-        printf("\n--- Génération de la semaine %d ---\n", num_semaine + 1);
-
-        /* Génération du planning pour chaque jour */
-        for (jour = 0; jour < 7; jour++) {
-            /* Calcul de la date du jour */
-            struct tm date_du_jour = date_base;
-            date_du_jour.tm_mday += num_semaine * 7 + jour;
-            mktime(&date_du_jour);
-
-            /* Réinitialise chaque ligne */
-            for (int ligne = 0; ligne < MAX_LIGNES; ligne++)
-                semaine[num_semaine][jour][ligne].nb_segments = 0;
-
-            int nb_lignes_utilisees = MAX_LIGNES;
-
-            /* Génération du planning optimisé avec les nouveaux horaires */
-            creer_planning_optimise(lutins_copie, nb_lutins, semaine[num_semaine][jour], &nb_lignes_utilisees, jour);
-        }
-    }
-}
 
 
 
@@ -347,6 +274,21 @@ void generer_semaine(Lutin *lutins, int nb_lutins, LigneFabrication semaine[MAX_
     for (jour = 0; jour < 7; jour++) {
         int nb_lignes = MAX_LIGNES;
         creer_planning_optimise(lutins, nb_lutins, &semaine[jour], &nb_lignes, jour);
+    }
+}
+
+
+void creer_planning_semaine(Lutin *lutins, int nb_lutins, LigneFabrication semaine[MAX_SEMAINES][7][MAX_LIGNES], int *nb_semaines) {
+    int num_semaine, jour;
+
+    /* Pour chaque semaine */
+    for (num_semaine = 0; num_semaine < *nb_semaines; num_semaine++) {
+        for (jour = 0; jour < 7; jour++) {
+            int nb_lignes = MAX_LIGNES;
+
+            /* Appel à la fonction d'optimisation réelle */
+            creer_planning_optimise(lutins, nb_lutins, semaine[num_semaine][jour], &nb_lignes, jour);
+        }
     }
 }
 
@@ -368,5 +310,26 @@ void afficher_semaine(LigneFabrication semaine[MAX_SEMAINES][7][MAX_LIGNES], int
         mktime(&date_du_jour); /* Pour que la date soit correcte */
 
         afficher_planning(semaine[num_semaine][jour], MAX_LIGNES, date_du_jour);
+    }
+}
+
+
+void supprimer_lutin_des_plannings(LigneFabrication semaines[MAX_SEMAINES][7][MAX_LIGNES], Lutin *lutin_supprime) {
+    int s, j, l, seg;
+
+    for (s = 0; s < MAX_SEMAINES; s++) {
+        for (j = 0; j < 7; j++) {
+            for (l = 0; l < MAX_LIGNES; l++) {
+                LigneFabrication *ligne = &semaines[s][j][l];
+
+                for (seg = 0; seg < ligne->nb_segments; seg++) {
+                    SegmentPlanning *segment = &ligne->segments[seg];
+
+                    if (segment->bricoleur == lutin_supprime) segment->bricoleur = NULL;
+                    if (segment->controleur == lutin_supprime) segment->controleur = NULL;
+                    if (segment->empaqueteur == lutin_supprime) segment->empaqueteur = NULL;
+                }
+            }
+        }
     }
 }

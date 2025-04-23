@@ -8,151 +8,83 @@
 #include <MLV/MLV_all.h>
 
 int main() {
-    int i, nb_lutins = 9, nb_lignes = MAX_LIGNES, jour = 1, debut = 0, fin = 23, choix, choix2, mode,choix_menu;
-    Lutin *lutins = NULL;
-    LigneFabrication semaines[MAX_SEMAINES][7][MAX_LIGNES];
-    int nb_semaines = MAX_SEMAINES;
+    int nb_lutins = 9;
+    int choix2, mode, choix_menu;
     int semaine_courante = 0;
     char choix_semaine;
+    int nb_semaines = MAX_SEMAINES;
 
-    srand(time(NULL));
+    Lutin *lutins = NULL;
 
-    printf("Choisissez votre mode d'exécution :\n");
-    printf(" 1 : Version Terminal\n");
-    printf(" 2 : Version Graphique\n");
-    printf("Votre choix : ");
-    if (scanf("%d", &mode) != 1) {
-        printf("Erreur de saisie du mode !\n");
+    LigneFabrication (*semaines)[7][MAX_LIGNES] = malloc(sizeof(LigneFabrication) * MAX_SEMAINES * 7 * MAX_LIGNES);
+    if (!semaines) {
+        fprintf(stderr, "Erreur allocation mémoire pour les semaines.\n");
         exit(EXIT_FAILURE);
     }
 
-    /* ---------------------------------- */
-    /*           MODE GRAPHIQUE           */
-    /* ---------------------------------- */
-    if (mode == 2) {
-        printf("Partie GRAPHIQUE\n");
-
-        creer_fenetre();
-        lutins = generer_lutin(nb_lutins);
-
-        if (!lutins) {
-            fprintf(stderr, "Erreur d'allocation mémoire pour les lutins.\n");
-            exit(EXIT_FAILURE);
-        }
-
-        while (1) {
-            choix_menu = menu(); 
-            if (choix_menu == 1) {
-                afficher_lutins_graph(lutins, nb_lutins);
-            }
-            else if (choix_menu == 2) {
-                // afficher_planning_graph(); // À implémenter plus tard
-            }
-            else if (choix_menu == 3) {
-                // charger_planning_graphique(); // À implémenter plus tard
-            }
-            else if (choix_menu == 4) {
-                free(lutins);
-                MLV_free_window();
-                exit(EXIT_SUCCESS);
-            }
-        }
+    srand(time(NULL));
+    lutins = generer_lutin(nb_lutins);
+    if (!lutins) {
+        fprintf(stderr, "Erreur d'allocation mémoire pour les lutins.\n");
+        free(semaines);
+        exit(EXIT_FAILURE);
     }
 
-    /* ---------------------------------- */
-    /*           MODE TERMINAL            */
-    /* ---------------------------------- */
-    else if (mode == 1) {
-        lutins = generer_lutin(nb_lutins);
-        if (lutins == NULL) {
-            printf("Erreur d'allocation mémoire des lutins.\n");
-            return 1;
-        }
+    creer_planning_semaine(lutins, nb_lutins, semaines, &nb_semaines);
 
+    struct tm date_base;
+    date_base.tm_year = 2025 - 1900;
+    date_base.tm_mon = 3;
+    date_base.tm_mday = 7;
+    date_base.tm_hour = 0;
+    date_base.tm_min = 0;
+    date_base.tm_sec = 0;
+    date_base.tm_isdst = -1;
+    mktime(&date_base);
+
+    printf("Choisissez votre mode d'affichage :\n");
+    printf(" 1 : Version Terminal\n");
+    printf(" 2 : Version Graphique\n");
+    printf(" 3 : Charger un planning (.ics)\n");
+    printf("Votre choix : ");
+    if (scanf("%d", &mode) != 1) {
+        printf("Erreur de saisie !\n");
+        free(lutins);
+        free(semaines);
+        return 1;
+    }
+
+    if (mode == 1) {
         printf("\nListe des lutins générés :\n");
-        for (i = 0; i < nb_lutins; i++) {
+        for (int i = 0; i < nb_lutins; i++) {
             afficher_lutin(lutins[i]);
             printf("\n");
         }
 
-        printf("\nSouhaitez-vous :\n");
-        printf(" 1: Générer automatiquement\n");
-        printf(" 2: Remplir manuellement\n");
-        printf(" 3: Charger un planning\n");
-        printf(" 4: Générer un planning optimisé pour la journée\n");
-        printf(" 5: Générer un planning optimisé pour la semaine\n");
-        printf(" 6: Quitter\n");
-        printf("Votre choix : ");
+        do {
+            printf("\n--- Semaine %d ---\n", semaine_courante + 1);
+            afficher_semaine(semaines, semaine_courante);
 
-        if (scanf("%d", &choix) != 1) {
-            printf("Erreur de saisie !\n");
-            free(lutins);
-            exit(EXIT_FAILURE);
-        }
+            printf("\nNavigation : n (suivant), p (précédent), q (quitter)\n");
+            printf("Votre choix : ");
+            if (scanf(" %c", &choix_semaine) != 1) break;
 
-        if (choix == 1) {
-            printf("test\n");
-        } else if (choix == 2) {
-            LigneFabrication lignes[MAX_LIGNES];
-            gerer_planning_manuel(lutins, nb_lutins, lignes, &nb_lignes, jour, debut, fin);
-            afficher_planning(lignes, nb_lignes, convertir_jour_date(0));
-        } else if (choix == 3) {
-            LigneFabrication lignes[MAX_LIGNES];
-            charger_planning(lutins, &nb_lutins, lignes, &nb_lignes);
-            afficher_planning(lignes, nb_lignes, convertir_jour_date(0));
-        } else if (choix == 4) {
-            LigneFabrication lignes[MAX_LIGNES];
-            creer_planning_optimise(lutins, nb_lutins, lignes, &nb_lignes, jour);
-            afficher_planning(lignes, nb_lignes, convertir_jour_date(jour));
-        } else if (choix == 5) {
-            creer_planning_semaine(lutins, nb_lutins, semaines, &nb_semaines);
-
-            do {
-                printf("\n--- Semaine %d ---\n", semaine_courante + 1);
-                afficher_semaine(semaines, semaine_courante);
-
-                printf("\nQue souhaitez-vous faire ?\n");
-                printf("n : Semaine suivante\n");
-                printf("p : Semaine précédente\n");
-                printf("q : Quitter la navigation\n");
-                printf("Votre choix : ");
-
-                if (scanf(" %c", &choix_semaine) != 1) {
-                    printf("Erreur de saisie !\n");
-                    break;
-                }
-
-                if (choix_semaine == 'n') {
-                    if (semaine_courante < nb_semaines - 1) {
-                        semaine_courante++;
-                    } else {
-                        printf("Vous êtes déjà à la dernière semaine.\n");
-                    }
-                } else if (choix_semaine == 'p') {
-                    if (semaine_courante > 0) {
-                        semaine_courante--;
-                    } else {
-                        printf("Vous êtes déjà à la première semaine.\n");
-                    }
-                }
-            } while (choix_semaine != 'q');
-        } else if (choix == 6) {
-            free(lutins);
-            exit(EXIT_SUCCESS);
-        } else {
-            printf("Choix invalide !\n");
-            free(lutins);
-            exit(EXIT_FAILURE);
-        }
+            if (choix_semaine == 'n') {
+                if (semaine_courante < nb_semaines - 1) semaine_courante++;
+                else printf("Dernière semaine.\n");
+            } else if (choix_semaine == 'p') {
+                if (semaine_courante > 0) semaine_courante--;
+                else printf("Première semaine.\n");
+            }
+        } while (choix_semaine != 'q');
 
         printf("\nSouhaitez-vous :\n");
-        printf(" 1 : Sauvegarder le planning (.txt)\n");
+        printf(" 1 : Sauvegarder le planning (.ics)\n");
         printf(" 2 : Quitter\n");
         printf("Votre choix : ");
-
         if (scanf("%d", &choix2) != 1) {
-            printf("Erreur de saisie !\n");
             free(lutins);
+            free(semaines);
             return 1;
         }
 
@@ -161,11 +93,50 @@ int main() {
         }
 
         free(lutins);
+        free(semaines);
+    }
+
+    else if (mode == 2) {
+        creer_fenetre();
+
+        while (1) {
+            choix_menu = menu();
+            if (choix_menu == 1) {
+                afficher_lutins_graph(lutins, nb_lutins, semaines);
+            }
+            else if (choix_menu == 2) {
+                afficher_semaine_graphique(semaines, semaine_courante, date_base);
+            }
+            else if (choix_menu == 3) {
+                charger_planning_graphique(semaines[semaine_courante], lutins, nb_lutins, semaine_courante);
+            }
+            else if (choix_menu == 4) {
+                free(lutins);
+                free(semaines);
+                MLV_free_window();
+                exit(EXIT_SUCCESS);
+            }
+        }
+    }
+
+    else if (mode == 3) {
+        char nom_fichier[100];
+        printf("Entrez le nom du fichier .ics à charger : ");
+        if (scanf("%99s", nom_fichier)!=1){
+            printf("Erreur");
+        }
+
+        charger_planning_ics(semaines[semaine_courante], lutins, nb_lutins, nom_fichier);
+        afficher_semaine(semaines, semaine_courante);
+
+        free(lutins);
+        free(semaines);
     }
 
     else {
         printf("Mode invalide !\n");
-        exit(EXIT_FAILURE);
+        free(lutins);
+        free(semaines);
     }
 
     return 0;
