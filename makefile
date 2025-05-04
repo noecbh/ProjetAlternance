@@ -4,7 +4,7 @@ LIBS = $(shell pkg-config --libs-only-other --libs-only-L MLV) $(shell pkg-confi
 
 OBJDIR = obj
 SRCDIR = src
-TARGET = projet
+TARGET = GestionPlannings
 
 SRCS = $(SRCDIR)/main.c $(SRCDIR)/lutins.c $(SRCDIR)/plannings.c $(SRCDIR)/fichiers.c $(SRCDIR)/ihm.c
 OBJS = $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
